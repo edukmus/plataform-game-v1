@@ -1,0 +1,16 @@
+export const VIEW_W = 960
+export const VIEW_H = 540
+export const WORLD_W = 4200
+export const GRAVITY = 2200
+export const MOVE_SPEED = 280
+export const ICE_ACCEL = 4.2
+export const ICE_DRAG = 1.7
+export const JUMP_VELOCITY = -720
+export const MAX_FALL = 980
+export const SHOT_SPEED = 620
+export const SHOT_COOLDOWN = 0.22
+export const PLAYER_W = 42
+export const PLAYER_H = 68
+export const MAX_HP = 5
+
+export const GROUND_Y = 460
