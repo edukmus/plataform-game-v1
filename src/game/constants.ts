@@ -11,6 +11,9 @@ export const SHOT_SPEED = 620
 export const SHOT_COOLDOWN = 0.22
 export const PLAYER_W = 42
 export const PLAYER_H = 68
-export const MAX_HP = 5
+export const START_LIVES = 3
+export const START_AMMO = 30
+export const AMMO_PACK = 15
+export const MAX_DIFFICULTY = 3
 
 export const GROUND_Y = 460

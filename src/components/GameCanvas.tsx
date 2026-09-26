@@ -2,7 +2,7 @@
 import headSrc from '../assets/kmus-head.png'
 import { GROUND_Y, VIEW_H, VIEW_W, WORLD_W } from '../game/constants.ts'
 import { useGameStore } from '../game/store.ts'
-import type { LevelTheme, Mountain } from '../game/types.ts'
+import type { LevelTheme, Mountain, Pickup } from '../game/types.ts'
 
 const head = new Image()
 head.src = headSrc
@@ -41,7 +41,7 @@ function draw(canvas: HTMLCanvasElement | null) {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  const { player, enemies, shots, cameraX, phase, stage } = useGameStore.getState()
+  const { player, enemies, items, shots, cameraX, phase, stage, time } = useGameStore.getState()
   const { platforms, theme, mountains } = stage
 
   ctx.clearRect(0, 0, VIEW_W, VIEW_H)
@@ -81,6 +81,8 @@ function draw(canvas: HTMLCanvasElement | null) {
     if (!enemy.alive) continue
     drawMet(ctx, enemy.x, enemy.y, enemy.w, enemy.h, enemy.vx < 0, enemy.kind)
   }
+
+  drawPickups(ctx, items, time)
 
   for (const shot of shots) {
     ctx.fillStyle = '#fef08a'
@@ -167,6 +169,33 @@ function drawSky(ctx: CanvasRenderingContext2D, cameraX: number, theme: LevelThe
     ctx.closePath()
     ctx.fill()
   })
+}
+
+function drawPickups(ctx: CanvasRenderingContext2D, items: Pickup[], time: number) {
+  for (const item of items) {
+    if (item.taken) continue
+    const bob = Math.sin(time * 3 + item.x * 0.02) * (item.kind === 'life' ? 6 : 4)
+    const y = item.baseY + bob
+    ctx.save()
+    if (item.kind === 'ammo') {
+      ctx.fillStyle = '#f8d48a'
+      ctx.fillRect(item.x + 4, y, 6, 4)
+      ctx.fillStyle = '#d4a017'
+      ctx.fillRect(item.x + 2, y + 4, 10, 13)
+      ctx.fillStyle = '#8a5a12'
+      ctx.fillRect(item.x, y + 16, 14, 4)
+    } else {
+      ctx.strokeStyle = '#facc15'
+      ctx.lineWidth = 2
+      ctx.strokeRect(item.x - 1, y - 1, item.w + 2, item.h + 2)
+      if (head.complete && head.naturalWidth > 0) ctx.drawImage(head, item.x, y, item.w, item.h)
+      else {
+        ctx.fillStyle = '#f59e0b'
+        ctx.fillRect(item.x, y, item.w, item.h)
+      }
+    }
+    ctx.restore()
+  }
 }
 
 function drawHero(

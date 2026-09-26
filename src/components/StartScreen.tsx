@@ -19,8 +19,12 @@ export function StartScreen() {
             <ul className="mx-auto mt-5 max-w-xs space-y-2 text-left font-mono text-xs text-cyan-100">
               <li>← → mover</li>
               <li>↑ saltar (doble en el aire)</li>
-              <li>ENTER disparar</li>
-              <li>ENTER siguiente nivel, al completar una etapa</li>
+              <li>ENTER disparar. Empiezas con 30 balas</li>
+              <li>3 vidas. Un golpe o una caída quita una</li>
+              <li>Cada nivel tiene munición (+15) y una vida extra flotante</li>
+              <li>El puntaje se acumula entre niveles</li>
+              <li>Sin vidas, la partida vuelve al inicio</li>
+              <li>Al completar los 4 niveles sube la dificultad</li>
             </ul>
             <p className="mt-4 text-[11px] leading-relaxed text-slate-400">
               También puedes moverte con A D y saltar con W o Espacio.

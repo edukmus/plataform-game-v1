@@ -1,5 +1,5 @@
 import { GROUND_Y, WORLD_W } from './constants.ts'
-import type { Enemy, LevelId, LevelTheme, Mountain, Platform } from './types.ts'
+import type { Difficulty, Enemy, LevelId, LevelTheme, Mountain, Pickup, Platform } from './types.ts'
 
 export const NIGHT_THEME: LevelTheme = {
   sky: ['#071426', '#123456', '#1d4e46'],
@@ -278,11 +278,74 @@ export interface Stage {
   level: LevelId
   platforms: Platform[]
   enemies: Enemy[]
+  items: Pickup[]
   theme: LevelTheme
   mountains: Mountain[]
 }
 
-export const buildStage = (level: LevelId, seed = 1): Stage => {
+export function multiplyEnemies(enemies: Enemy[], difficulty: Difficulty): Enemy[] {
+  if (difficulty <= 1) return enemies
+  const extra: Enemy[] = []
+  for (let copy = 1; copy < difficulty; copy += 1) {
+    const side = copy % 2 === 0 ? -1 : 1
+    for (const enemy of enemies) {
+      const shift = Math.min(56, Math.max(28, enemy.range * 0.35)) * side
+      let x = enemy.originX + shift
+      if (x < 220) x = Math.max(220, enemy.x + 72 * copy)
+      x = Math.max(180, Math.min(WORLD_W - 48, x))
+      extra.push({
+        ...enemy,
+        id: `${enemy.id}-d${copy}`,
+        x,
+        originX: x,
+        vx: -enemy.vx,
+        hop: enemy.hop + copy * 0.8,
+      })
+    }
+  }
+  return [...enemies, ...extra]
+}
+
+const onPlatform = (platform: Platform, w: number, h: number, align: number) => {
+  const x = platform.x + Math.max(6, (platform.w - w) * align)
+  const baseY = platform.y - h - 12
+  return { x, y: baseY, baseY, w, h }
+}
+
+export function placeItems(level: LevelId, platforms: Platform[]): Pickup[] {
+  const surfaces = platforms
+    .filter((platform) => platform.kind !== 'goal' && platform.w >= 80 && platform.x > 260 && platform.x < WORLD_W - 160)
+    .sort((a, b) => a.x - b.x)
+  if (surfaces.length === 0) return []
+
+  const ammoPlatform = surfaces[Math.min(surfaces.length - 1, Math.floor(surfaces.length * 0.38))]
+  const items: Pickup[] = [
+    {
+      id: `${level}-ammo`,
+      kind: 'ammo',
+      taken: false,
+      ...onPlatform(ammoPlatform, 14, 22, 0.62),
+    },
+  ]
+
+  const later = surfaces.filter((platform) => platform.id !== ammoPlatform.id && platform.x > ammoPlatform.x + 40)
+  const lifePlatform = later[Math.floor(later.length * 0.5)] ?? surfaces.find((platform) => platform.id !== ammoPlatform.id) ?? ammoPlatform
+  const life = {
+    id: `${level}-life`,
+    kind: 'life' as const,
+    taken: false,
+    ...onPlatform(lifePlatform, 28, 28, lifePlatform.id === ammoPlatform.id ? 0.12 : 0.28),
+  }
+  if (Math.abs(life.x - items[0].x) < 52) life.x = items[0].x + 70
+  const minX = lifePlatform.x + 4
+  const maxX = lifePlatform.x + lifePlatform.w - life.w - 4
+  life.x = Math.max(minX, Math.min(maxX, life.x))
+  items.push(life)
+
+  return items
+}
+
+const buildLevel = (level: LevelId, seed: number): Omit<Stage, 'items'> => {
   if (level === 1) {
     return {
       level,
@@ -320,6 +383,15 @@ export const buildStage = (level: LevelId, seed = 1): Stage => {
     enemies: varyEnemies(level1Enemies(), rand),
     theme: SUN_THEME,
     mountains: sunMountains(rand),
+  }
+}
+
+export const buildStage = (level: LevelId, seed = 1, difficulty: Difficulty = 1): Stage => {
+  const stage = buildLevel(level, seed)
+  return {
+    ...stage,
+    enemies: multiplyEnemies(stage.enemies, difficulty),
+    items: placeItems(level, stage.platforms),
   }
 }
 

@@ -49,6 +49,17 @@ export interface LevelTheme {
 
 export type LevelId = 1 | 2 | 3 | 4
 
+export type Difficulty = 1 | 2 | 3
+
+export type PickupKind = 'ammo' | 'life'
+
+export interface Pickup extends Rect {
+  id: string
+  kind: PickupKind
+  baseY: number
+  taken: boolean
+}
+
 export interface Projectile extends Rect {
   id: string
   vx: number
@@ -64,7 +75,6 @@ export interface Player {
   facing: 1 | -1
   onGround: boolean
   jumpsLeft: number
-  hp: number
   invuln: number
   shootCd: number
 }

@@ -15,8 +15,9 @@ const keyMap: Record<string, keyof Keys> = {
 
 export function useGameInput() {
   const setKey = useGameStore((state) => state.setKey)
-  const start = useGameStore((state) => state.start)
   const next = useGameStore((state) => state.next)
+  const advanceDifficulty = useGameStore((state) => state.advanceDifficulty)
+  const returnToMenu = useGameStore((state) => state.returnToMenu)
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent, down: boolean) => {
@@ -35,7 +36,8 @@ export function useGameInput() {
       if (phase !== 'playing') {
         if (!down || event.repeat) return
         if (event.code === 'Enter' && phase === 'won' && level < 4) next()
-        else if (event.code === 'Enter' || event.code === 'ArrowUp') start(phase === 'lost' ? level : 1)
+        else if ((event.code === 'Enter' || event.code === 'ArrowUp') && phase === 'won') advanceDifficulty()
+        else if (event.code === 'Enter' || event.code === 'ArrowUp') returnToMenu()
         return
       }
       setKey(action, down)
@@ -49,5 +51,5 @@ export function useGameInput() {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
-  }, [setKey, start, next])
+  }, [setKey, next, advanceDifficulty, returnToMenu])
 }
