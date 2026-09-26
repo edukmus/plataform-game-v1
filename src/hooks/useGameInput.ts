@@ -20,10 +20,18 @@ export function useGameInput() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent, down: boolean) => {
+      const { phase, level, menuView } = useGameStore.getState()
+      if (phase === 'menu') {
+        if (menuView === 'instructions' && down && !event.repeat && event.code === 'Escape') {
+          event.preventDefault()
+          useGameStore.getState().closeInstructions()
+        }
+        return
+      }
+
       const action = keyMap[event.code]
       if (!action) return
       event.preventDefault()
-      const { phase, level } = useGameStore.getState()
       if (phase !== 'playing') {
         if (!down || event.repeat) return
         if (event.code === 'Enter' && phase === 'won' && level < 4) next()
