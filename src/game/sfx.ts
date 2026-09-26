@@ -1,6 +1,6 @@
 let ctx: AudioContext | null = null
 
-function audio(): AudioContext | null {
+export function getAudioContext(): AudioContext | null {
   const AC = window.AudioContext
   if (!AC) return null
   if (!ctx) ctx = new AC()
@@ -15,7 +15,7 @@ function tone(
   volume: number,
   slideTo?: number,
 ) {
-  const ac = audio()
+  const ac = getAudioContext()
   if (!ac) return
 
   const t = ac.currentTime
@@ -53,4 +53,13 @@ export function playStageClear() {
 export function playEnemyDown() {
   tone(220, 0.06, 'square', 0.12, 90)
   window.setTimeout(() => tone(140, 0.14, 'triangle', 0.1, 50), 50)
+}
+
+export function playPickup() {
+  tone(740, 0.07, 'square', 0.07, 1180)
+}
+
+export function playLife() {
+  tone(523, 0.1, 'triangle', 0.08, 784)
+  window.setTimeout(() => tone(1046, 0.14, 'triangle', 0.07), 90)
 }
