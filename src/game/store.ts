@@ -36,8 +36,11 @@ const freshPlayer = (): Player => ({
   shootCd: 0,
 })
 
+export type MenuView = 'home' | 'instructions'
+
 interface GameState {
   phase: Phase
+  menuView: MenuView
   level: LevelId
   stage: Stage
   player: Player
@@ -49,6 +52,8 @@ interface GameState {
   score: number
   time: number
   setKey: (key: keyof Keys, down: boolean) => void
+  openInstructions: () => void
+  closeInstructions: () => void
   start: (level?: LevelId) => void
   next: () => void
   tick: (dt: number) => void
@@ -58,6 +63,7 @@ const opening = buildStage(1)
 
 export const useGameStore = create<GameState>((set, get) => ({
   phase: 'menu',
+  menuView: 'home',
   level: 1,
   stage: opening,
   player: freshPlayer(),
@@ -72,10 +78,18 @@ export const useGameStore = create<GameState>((set, get) => ({
   setKey: (key, down) =>
     set((state) => ({ keys: { ...state.keys, [key]: down } })),
 
+  openInstructions: () => {
+    if (get().phase !== 'menu') return
+    set({ menuView: 'instructions' })
+  },
+
+  closeInstructions: () => set({ menuView: 'home' }),
+
   start: (level = 1) => {
     const stage = buildStage(level, level === 2 ? Date.now() : 1)
     set({
       phase: 'playing',
+      menuView: 'home',
       level,
       stage,
       player: freshPlayer(),
