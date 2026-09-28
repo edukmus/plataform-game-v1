@@ -1,5 +1,5 @@
 import { GROUND_Y, WORLD_W } from './constants.ts'
-import type { Difficulty, Enemy, LevelId, LevelTheme, Mountain, Pickup, Platform } from './types.ts'
+import type { Checkpoint, Difficulty, Enemy, LevelId, LevelTheme, Mountain, Pickup, Platform } from './types.ts'
 
 export const NIGHT_THEME: LevelTheme = {
   sky: ['#071426', '#123456', '#1d4e46'],
@@ -105,6 +105,8 @@ const patrol = (
   kind: 'patrol',
   hop: 0,
   baseY: y,
+  hp: 1,
+  maxHp: 1,
 })
 
 const level1Enemies = (): Enemy[] => [
@@ -266,6 +268,13 @@ const voidEnemies = (): Enemy[] => {
       list.push(extra)
     }
   }
+  const boss = patrol('v-boss', 3760, GROUND_Y - 96, -95, 220)
+  boss.kind = 'boss'
+  boss.w = 124
+  boss.h = 96
+  boss.hp = 14
+  boss.maxHp = 14
+  list.push(boss)
   return list
 }
 
@@ -279,31 +288,69 @@ export interface Stage {
   platforms: Platform[]
   enemies: Enemy[]
   items: Pickup[]
+  checkpoints: Checkpoint[]
   theme: LevelTheme
   mountains: Mountain[]
 }
 
 export function multiplyEnemies(enemies: Enemy[], difficulty: Difficulty): Enemy[] {
   if (difficulty <= 1) return enemies
+
+  const regular = enemies.filter((enemy) => enemy.kind !== 'boss')
+  const bosses = enemies.filter((enemy) => enemy.kind === 'boss')
   const extra: Enemy[] = []
-  for (let copy = 1; copy < difficulty; copy += 1) {
-    const side = copy % 2 === 0 ? -1 : 1
-    for (const enemy of enemies) {
-      const shift = Math.min(56, Math.max(28, enemy.range * 0.35)) * side
-      let x = enemy.originX + shift
-      if (x < 220) x = Math.max(220, enemy.x + 72 * copy)
-      x = Math.max(180, Math.min(WORLD_W - 48, x))
-      extra.push({
-        ...enemy,
-        id: `${enemy.id}-d${copy}`,
-        x,
-        originX: x,
-        vx: -enemy.vx,
-        hop: enemy.hop + copy * 0.8,
-      })
-    }
+
+  const addClone = (enemy: Enemy, copy: number, index: number) => {
+    const side = index % 2 === 0 ? 1 : -1
+    const shift = Math.min(62, Math.max(30, enemy.range * 0.32)) * side * copy
+    let x = enemy.originX + shift
+    if (x < 220) x = Math.max(220, enemy.x + 72 * copy)
+    x = Math.max(180, Math.min(WORLD_W - 48, x))
+    extra.push({
+      ...enemy,
+      id: `${enemy.id}-d${copy}-${index}`,
+      x,
+      originX: x,
+      vx: -enemy.vx,
+      hop: enemy.hop + copy * 0.8 + index * 0.15,
+    })
   }
-  return [...enemies, ...extra]
+
+  if (difficulty === 2) {
+    regular.forEach((enemy, index) => {
+      if (index % 2 === 0) addClone(enemy, 1, index)
+    })
+  } else {
+    regular.forEach((enemy, index) => addClone(enemy, 1, index))
+    regular.forEach((enemy, index) => {
+      if (index % 3 === 0) addClone(enemy, 2, index)
+    })
+  }
+
+  return [...regular, ...bosses, ...extra]
+}
+
+function tuneEnemiesForDifficulty(enemies: Enemy[], difficulty: Difficulty): Enemy[] {
+  const speedScale = difficulty === 1 ? 1 : difficulty === 2 ? 1.12 : 1.24
+  return enemies.map((enemy) => {
+    const dir = enemy.vx < 0 ? -1 : 1
+    const speed = Math.abs(enemy.vx)
+    if (enemy.kind === 'boss') {
+      const hp = enemy.maxHp + (difficulty - 1) * 4
+      return {
+        ...enemy,
+        hp,
+        maxHp: hp,
+        vx: dir * Math.max(82, speed * (1 + (difficulty - 1) * 0.08)),
+        range: Math.round(enemy.range * (1 + (difficulty - 1) * 0.06)),
+      }
+    }
+    return {
+      ...enemy,
+      vx: dir * Math.max(52, speed * speedScale),
+      range: Math.round(enemy.range * (1 + (difficulty - 1) * 0.04)),
+    }
+  })
 }
 
 const onPlatform = (platform: Platform, w: number, h: number, align: number) => {
@@ -312,13 +359,70 @@ const onPlatform = (platform: Platform, w: number, h: number, align: number) => 
   return { x, y: baseY, baseY, w, h }
 }
 
+const checkpointAnchors: Record<LevelId, number[]> = {
+  1: [860, 1780, 2920],
+  2: [940, 1940, 3060],
+  3: [760, 1660, 2780],
+  4: [680, 1480, 2420, 3340],
+}
+
+const checkpointFromPlatform = (id: string, anchorX: number, platform: Platform): Checkpoint => {
+  const w = 26
+  const h = 56
+  const minX = platform.x + 6
+  const maxX = platform.x + platform.w - w - 6
+  const x = Math.max(minX, Math.min(maxX, anchorX - w / 2))
+  return {
+    id,
+    x,
+    y: platform.y - h,
+    w,
+    h,
+    active: false,
+  }
+}
+
+export function placeCheckpoints(level: LevelId, platforms: Platform[]): Checkpoint[] {
+  const surfaces = platforms.filter((platform) => platform.kind !== 'goal' && platform.w >= 120)
+  if (surfaces.length === 0) return []
+
+  const anchors = checkpointAnchors[level]
+  return anchors.map((anchor, index) => {
+    const onTop = surfaces.find((platform) => anchor >= platform.x + 8 && anchor <= platform.x + platform.w - 8)
+    const nearest =
+      onTop ??
+      surfaces.reduce((best, platform) => {
+        const bestDist = Math.abs(best.x + best.w / 2 - anchor)
+        const currentDist = Math.abs(platform.x + platform.w / 2 - anchor)
+        return currentDist < bestDist ? platform : best
+      }, surfaces[0])
+    return checkpointFromPlatform(`${level}-cp-${index}`, anchor, nearest)
+  })
+}
+
 export function placeItems(level: LevelId, platforms: Platform[]): Pickup[] {
   const surfaces = platforms
     .filter((platform) => platform.kind !== 'goal' && platform.w >= 80 && platform.x > 260 && platform.x < WORLD_W - 160)
     .sort((a, b) => a.x - b.x)
   if (surfaces.length === 0) return []
 
-  const ammoPlatform = surfaces[Math.min(surfaces.length - 1, Math.floor(surfaces.length * 0.38))]
+  const used = new Set<string>()
+  const pickSurface = (ratio: number) => {
+    const index = Math.min(surfaces.length - 1, Math.floor(surfaces.length * ratio))
+    if (!used.has(surfaces[index].id)) {
+      used.add(surfaces[index].id)
+      return surfaces[index]
+    }
+    const fallback = surfaces.find((platform) => !used.has(platform.id)) ?? surfaces[index]
+    used.add(fallback.id)
+    return fallback
+  }
+
+  const ammoPlatform = pickSurface(0.34)
+  const spreadPlatform = pickSurface(0.56)
+  const rapidPlatform = pickSurface(0.76)
+  const lifePlatform = pickSurface(0.88)
+
   const items: Pickup[] = [
     {
       id: `${level}-ammo`,
@@ -326,26 +430,30 @@ export function placeItems(level: LevelId, platforms: Platform[]): Pickup[] {
       taken: false,
       ...onPlatform(ammoPlatform, 14, 22, 0.62),
     },
+    {
+      id: `${level}-spread`,
+      kind: 'spread',
+      taken: false,
+      ...onPlatform(spreadPlatform, 22, 20, 0.25),
+    },
+    {
+      id: `${level}-rapid`,
+      kind: 'rapid',
+      taken: false,
+      ...onPlatform(rapidPlatform, 22, 20, 0.62),
+    },
+    {
+      id: `${level}-life`,
+      kind: 'life',
+      taken: false,
+      ...onPlatform(lifePlatform, 28, 28, 0.36),
+    },
   ]
-
-  const later = surfaces.filter((platform) => platform.id !== ammoPlatform.id && platform.x > ammoPlatform.x + 40)
-  const lifePlatform = later[Math.floor(later.length * 0.5)] ?? surfaces.find((platform) => platform.id !== ammoPlatform.id) ?? ammoPlatform
-  const life = {
-    id: `${level}-life`,
-    kind: 'life' as const,
-    taken: false,
-    ...onPlatform(lifePlatform, 28, 28, lifePlatform.id === ammoPlatform.id ? 0.12 : 0.28),
-  }
-  if (Math.abs(life.x - items[0].x) < 52) life.x = items[0].x + 70
-  const minX = lifePlatform.x + 4
-  const maxX = lifePlatform.x + lifePlatform.w - life.w - 4
-  life.x = Math.max(minX, Math.min(maxX, life.x))
-  items.push(life)
 
   return items
 }
 
-const buildLevel = (level: LevelId, seed: number): Omit<Stage, 'items'> => {
+const buildLevel = (level: LevelId, seed: number): Omit<Stage, 'items' | 'checkpoints'> => {
   if (level === 1) {
     return {
       level,
@@ -388,10 +496,13 @@ const buildLevel = (level: LevelId, seed: number): Omit<Stage, 'items'> => {
 
 export const buildStage = (level: LevelId, seed = 1, difficulty: Difficulty = 1): Stage => {
   const stage = buildLevel(level, seed)
+  const populated = multiplyEnemies(stage.enemies, difficulty)
+  const tuned = tuneEnemiesForDifficulty(populated, difficulty)
   return {
     ...stage,
-    enemies: multiplyEnemies(stage.enemies, difficulty),
+    enemies: tuned,
     items: placeItems(level, stage.platforms),
+    checkpoints: placeCheckpoints(level, stage.platforms),
   }
 }
 

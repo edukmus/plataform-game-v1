@@ -11,6 +11,9 @@ const keyMap: Record<string, keyof Keys> = {
   KeyW: 'jump',
   Space: 'jump',
   Enter: 'shoot',
+  ShiftLeft: 'dash',
+  ShiftRight: 'dash',
+  KeyX: 'dash',
 }
 
 export function useGameInput() {
