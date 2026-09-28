@@ -12,7 +12,7 @@ export interface Platform extends Rect {
   kind: 'ground' | 'ledge' | 'goal'
 }
 
-export type EnemyKind = 'patrol' | 'hopper'
+export type EnemyKind = 'patrol' | 'hopper' | 'boss'
 
 export interface Enemy extends Rect {
   id: string
@@ -23,6 +23,13 @@ export interface Enemy extends Rect {
   kind: EnemyKind
   hop: number
   baseY: number
+  hp: number
+  maxHp: number
+}
+
+export interface Checkpoint extends Rect {
+  id: string
+  active: boolean
 }
 
 export interface Mountain {
@@ -49,9 +56,28 @@ export interface LevelTheme {
 
 export type LevelId = 1 | 2 | 3 | 4
 
+export type Difficulty = 1 | 2 | 3
+
+export type PickupKind = 'ammo' | 'life' | 'spread' | 'rapid'
+
+export interface Pickup extends Rect {
+  id: string
+  kind: PickupKind
+  baseY: number
+  taken: boolean
+}
+
 export interface Projectile extends Rect {
   id: string
   vx: number
+  vy: number
+}
+
+export interface EnemyShot extends Rect {
+  id: string
+  vx: number
+  vy: number
+  ttl: number
 }
 
 export interface Player {
@@ -64,9 +90,10 @@ export interface Player {
   facing: 1 | -1
   onGround: boolean
   jumpsLeft: number
-  hp: number
   invuln: number
   shootCd: number
+  dashCd: number
+  dashTime: number
 }
 
 export interface Keys {
@@ -74,4 +101,5 @@ export interface Keys {
   right: boolean
   jump: boolean
   shoot: boolean
+  dash: boolean
 }
