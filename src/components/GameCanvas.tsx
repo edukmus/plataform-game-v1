@@ -1,8 +1,8 @@
 ﻿import { useEffect, useRef } from 'react'
 import headSrc from '../assets/kmus-head.png'
-import { GROUND_Y, VIEW_H, VIEW_W, WORLD_W } from '../game/constants.ts'
+import { CHECKPOINT_FLASH_DURATION, GROUND_Y, VIEW_H, VIEW_W, WORLD_W } from '../game/constants.ts'
 import { useGameStore } from '../game/store.ts'
-import type { LevelTheme, Mountain, Pickup } from '../game/types.ts'
+import type { Checkpoint, EnemyKind, LevelTheme, Mountain, Pickup } from '../game/types.ts'
 
 const head = new Image()
 head.src = headSrc
@@ -41,7 +41,7 @@ function draw(canvas: HTMLCanvasElement | null) {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  const { player, enemies, items, shots, cameraX, phase, stage, time } = useGameStore.getState()
+  const { player, enemies, items, checkpoints, shots, enemyShots, checkpointFlash, checkpointBanner, cameraX, phase, stage, time } = useGameStore.getState()
   const { platforms, theme, mountains } = stage
 
   ctx.clearRect(0, 0, VIEW_W, VIEW_H)
@@ -77,6 +77,8 @@ function draw(canvas: HTMLCanvasElement | null) {
     ctx.strokeRect(platform.x + 0.5, platform.y + 0.5, platform.w - 1, platform.h - 1)
   }
 
+  drawCheckpoints(ctx, checkpoints, time)
+
   for (const enemy of enemies) {
     if (!enemy.alive) continue
     drawMet(ctx, enemy.x, enemy.y, enemy.w, enemy.h, enemy.vx < 0, enemy.kind)
@@ -85,9 +87,18 @@ function draw(canvas: HTMLCanvasElement | null) {
   drawPickups(ctx, items, time)
 
   for (const shot of shots) {
-    ctx.fillStyle = '#fef08a'
-    ctx.shadowColor = '#facc15'
-    ctx.shadowBlur = 12
+    const spread = Math.abs(shot.vy) > 0
+    ctx.fillStyle = spread ? '#99f6e4' : '#fef08a'
+    ctx.shadowColor = spread ? '#2dd4bf' : '#facc15'
+    ctx.shadowBlur = spread ? 10 : 12
+    ctx.fillRect(shot.x, shot.y, shot.w, shot.h)
+    ctx.shadowBlur = 0
+  }
+
+  for (const shot of enemyShots) {
+    ctx.fillStyle = '#fb7185'
+    ctx.shadowColor = '#f43f5e'
+    ctx.shadowBlur = 10
     ctx.fillRect(shot.x, shot.y, shot.w, shot.h)
     ctx.shadowBlur = 0
   }
@@ -101,14 +112,42 @@ function draw(canvas: HTMLCanvasElement | null) {
     player.invuln > 0 && Math.floor(player.invuln * 12) % 2 === 0,
     player.onGround,
     player.vx,
-    useGameStore.getState().time,
+    time,
+    player.dashTime,
   )
 
   ctx.restore()
 
+  drawCheckpointSignal(ctx, checkpointFlash, checkpointBanner)
+
   if (phase !== 'playing') {
     ctx.fillStyle = 'rgba(2, 8, 18, 0.35)'
     ctx.fillRect(0, 0, VIEW_W, VIEW_H)
+  }
+}
+
+function drawCheckpointSignal(ctx: CanvasRenderingContext2D, flash: number, banner: number) {
+  if (flash > 0) {
+    const alpha = Math.min(0.5, (flash / CHECKPOINT_FLASH_DURATION) * 0.5)
+    ctx.fillStyle = `rgba(103, 232, 249, ${alpha})`
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H)
+  }
+
+  if (banner > 0) {
+    const alpha = Math.min(1, banner / 0.35)
+    ctx.save()
+    ctx.globalAlpha = alpha
+    ctx.fillStyle = 'rgba(2, 8, 23, 0.82)'
+    ctx.fillRect(VIEW_W / 2 - 160, 34, 320, 36)
+    ctx.strokeStyle = '#67e8f9'
+    ctx.lineWidth = 2
+    ctx.strokeRect(VIEW_W / 2 - 160, 34, 320, 36)
+    ctx.fillStyle = '#cffafe'
+    ctx.font = '900 16px monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('CHECKPOINT +20 BALAS', VIEW_W / 2, 52)
+    ctx.restore()
   }
 }
 
@@ -171,6 +210,23 @@ function drawSky(ctx: CanvasRenderingContext2D, cameraX: number, theme: LevelThe
   })
 }
 
+function drawCheckpoints(ctx: CanvasRenderingContext2D, checkpoints: Checkpoint[], time: number) {
+  for (const checkpoint of checkpoints) {
+    const pulse = checkpoint.active ? 0.75 + Math.sin(time * 6) * 0.25 : 0.35 + Math.sin(time * 4) * 0.08
+    ctx.fillStyle = checkpoint.active ? `rgba(34, 211, 238, ${Math.max(0.2, pulse)})` : 'rgba(148, 163, 184, 0.45)'
+    ctx.fillRect(checkpoint.x + 10, checkpoint.y, 6, checkpoint.h)
+
+    ctx.fillStyle = checkpoint.active ? 'rgba(103, 232, 249, 0.88)' : 'rgba(148, 163, 184, 0.6)'
+    ctx.beginPath()
+    ctx.moveTo(checkpoint.x + checkpoint.w / 2, checkpoint.y + 5)
+    ctx.lineTo(checkpoint.x + checkpoint.w - 2, checkpoint.y + 16)
+    ctx.lineTo(checkpoint.x + checkpoint.w / 2, checkpoint.y + 27)
+    ctx.lineTo(checkpoint.x + 2, checkpoint.y + 16)
+    ctx.closePath()
+    ctx.fill()
+  }
+}
+
 function drawPickups(ctx: CanvasRenderingContext2D, items: Pickup[], time: number) {
   for (const item of items) {
     if (item.taken) continue
@@ -184,6 +240,23 @@ function drawPickups(ctx: CanvasRenderingContext2D, items: Pickup[], time: numbe
       ctx.fillRect(item.x + 2, y + 4, 10, 13)
       ctx.fillStyle = '#8a5a12'
       ctx.fillRect(item.x, y + 16, 14, 4)
+    } else if (item.kind === 'spread') {
+      ctx.fillStyle = '#34d399'
+      ctx.fillRect(item.x + 9, y + 2, 4, 14)
+      ctx.fillRect(item.x + 3, y + 8, 4, 10)
+      ctx.fillRect(item.x + 15, y + 8, 4, 10)
+      ctx.fillStyle = '#99f6e4'
+      ctx.fillRect(item.x + 8, y, 6, 4)
+      ctx.fillRect(item.x + 2, y + 6, 6, 4)
+      ctx.fillRect(item.x + 14, y + 6, 6, 4)
+    } else if (item.kind === 'rapid') {
+      ctx.fillStyle = '#f43f5e'
+      ctx.fillRect(item.x + 8, y, 8, 5)
+      ctx.fillStyle = '#fb7185'
+      ctx.fillRect(item.x + 4, y + 5, 8, 5)
+      ctx.fillRect(item.x + 10, y + 10, 8, 5)
+      ctx.fillStyle = '#ffe4e6'
+      ctx.fillRect(item.x + 7, y + 15, 6, 4)
     } else {
       ctx.strokeStyle = '#facc15'
       ctx.lineWidth = 2
@@ -208,6 +281,7 @@ function drawHero(
   onGround: boolean,
   vx: number,
   time: number,
+  dashTime: number,
 ) {
   if (hidden) return
 
@@ -215,6 +289,14 @@ function drawHero(
   const step = walking ? Math.sin(time * 11) : 0
   const bob = walking ? Math.abs(Math.sin(time * 11)) * 2 : 0
   const bodyY = y - bob
+
+  if (dashTime > 0) {
+    ctx.fillStyle = 'rgba(34, 211, 238, 0.7)'
+    const trailX = vx >= 0 ? x - 24 : x + w + 2
+    ctx.fillRect(trailX, bodyY + 36, 20, 12)
+    ctx.fillStyle = 'rgba(103, 232, 249, 0.5)'
+    ctx.fillRect(trailX + (vx >= 0 ? -14 : 14), bodyY + 39, 14, 7)
+  }
 
   ctx.fillStyle = '#dc2626'
   ctx.fillRect(x + 8, bodyY + 30, w - 16, 24)
@@ -274,11 +356,26 @@ function drawMet(
   w: number,
   h: number,
   flip: boolean,
-  kind: 'patrol' | 'hopper',
+  kind: EnemyKind,
 ) {
   ctx.save()
   ctx.translate(x + w / 2, y + h / 2)
   ctx.scale(flip ? -1 : 1, 1)
+  if (kind === 'boss') {
+    ctx.fillStyle = '#7f1d1d'
+    ctx.fillRect(-w / 2, -h / 2 + 8, w, h - 8)
+    ctx.fillStyle = '#991b1b'
+    ctx.fillRect(-w / 2 + 8, -h / 2, w - 16, h - 20)
+    ctx.fillStyle = '#facc15'
+    ctx.fillRect(-w / 2 + 18, -h / 2 + 26, 18, 12)
+    ctx.fillRect(w / 2 - 36, -h / 2 + 26, 18, 12)
+    ctx.fillStyle = '#0f172a'
+    ctx.fillRect(-w / 2 + 14, h / 2 - 20, w - 28, 12)
+    ctx.fillStyle = '#ef4444'
+    ctx.fillRect(-w / 2 + 12, -h / 2 + 52, w - 24, 12)
+    ctx.restore()
+    return
+  }
   ctx.fillStyle = kind === 'hopper' ? '#f97316' : '#ef4444'
   ctx.beginPath()
   ctx.ellipse(0, -4, w / 2, h / 2.2, 0, Math.PI, 0)

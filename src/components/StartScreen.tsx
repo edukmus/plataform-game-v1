@@ -19,15 +19,20 @@ export function StartScreen() {
             <ul className="mx-auto mt-5 max-w-xs space-y-2 text-left font-mono text-xs text-cyan-100">
               <li>← → mover</li>
               <li>↑ saltar (doble en el aire)</li>
-              <li>ENTER disparar. Empiezas con 30 balas</li>
+              <li>ENTER disparar. Municion inicial segun dificultad</li>
+              <li>SHIFT o X dash horizontal (recarga rapida)</li>
+              <li>Activa checkpoints: reapareces ahi y recuperas +20 balas</li>
+              <li>Power-up verde: disparo triple temporal</li>
+              <li>Power-up rosa: disparo rapido temporal</li>
               <li>3 vidas. Un golpe o una caída quita una</li>
-              <li>Cada nivel tiene munición (+15) y una vida extra flotante</li>
+              <li>Cada nivel tiene una recarga de municion y una vida extra flotante</li>
+              <li>En el nivel 4 el boss dispara proyectiles y debes derrotarlo antes de la meta</li>
               <li>El puntaje se acumula entre niveles</li>
               <li>Sin vidas, la partida vuelve al inicio</li>
               <li>Al completar los 4 niveles sube la dificultad</li>
             </ul>
             <p className="mt-4 text-[11px] leading-relaxed text-slate-400">
-              También puedes moverte con A D y saltar con W o Espacio.
+              También puedes moverte con A D, saltar con W o Espacio y hacer dash con Shift o X.
             </p>
             <button
               type="button"
